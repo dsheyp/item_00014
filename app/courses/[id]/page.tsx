@@ -361,7 +361,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                 <div className="flex items-center gap-2 mb-4">
                   <StarRating rating={course.rating} />
                   <span className="font-medium">{course.rating.toFixed(1)}</span>
-                  <span className="text-sm text-muted-foreground">({course.reviews.length as unknown as string}ratings)</span>
+                  <span className="text-sm text-muted-foreground">({course.reviews.length as unknown as string} ratings)</span>
                 </div>
                 <ul className="space-y-2">
                   <li className="flex items-center">
