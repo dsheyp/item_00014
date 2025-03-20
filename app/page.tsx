@@ -182,9 +182,6 @@ export default function Home() {
                 Join thousands of students already learning with our platform.
               </p>
             </div>
-            <Button size="lg" asChild>
-              <Link href="/auth/signup">Sign Up Now</Link>
-            </Button>
           </div>
         </div>
       </section>
