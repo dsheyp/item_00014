@@ -223,7 +223,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
             <img
               src={course.image || "/placeholder.svg"}
               alt={course.title}
-              className="w-full rounded-lg mb-6 h-[30rem] object-cover"
+              className="w-full rounded-lg mb-6 h-[14rem] md:h-[30rem] object-cover"
             />
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <h1 className="text-3xl font-bold tracking-tighter md:text-4xl">{course.title}</h1>
@@ -270,8 +270,8 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                 <TabsTrigger value="instructor">Instructor</TabsTrigger>
                 <TabsTrigger value="reviews" className="flex items-center gap-1">
                   Reviews
-                  <span className="inline-flex items-center justify-center rounded-full bg-primary/10 px-1 py-0.5 text-xs font-medium text-primary">
-                  {course.reviews.length as unknown as string}
+                  <span className="hidden sm:inline-flex items-center justify-center rounded-full bg-primary/10 px-1 py-0.5 text-xs font-medium text-primary">
+                    {course.reviews.length as unknown as string}
                   </span>
                 </TabsTrigger>
               </TabsList>
