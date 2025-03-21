@@ -52,39 +52,6 @@ export interface Course {
 
 const featuredCourses: Course[] = (allCourses as unknown as []).sort(() => Math.random() - Math.random()).slice(0, 3)
 
-const featuredCourses__ = [
-  {
-    id: 1,
-    title: "Introduction to Web Development",
-    description: "Learn the fundamentals of HTML, CSS, and JavaScript to build modern websites.",
-    students: 1234,
-    lessons: 24,
-    image: "/placeholder.svg?height=200&width=400",
-    rating: 4.8,
-    reviews: 342,
-  },
-  {
-    id: 2,
-    title: "Advanced React Patterns",
-    description: "Master advanced React concepts including hooks, context, and performance optimization.",
-    students: 856,
-    lessons: 18,
-    image: "/placeholder.svg?height=200&width=400",
-    rating: 4.6,
-    reviews: 189,
-  },
-  {
-    id: 3,
-    title: "Full-Stack Development with Next.js",
-    description: "Build complete web applications with Next.js, from frontend to backend.",
-    students: 642,
-    lessons: 32,
-    image: "/placeholder.svg?height=200&width=400",
-    rating: 4.7,
-    reviews: 128,
-  },
-]
-
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">

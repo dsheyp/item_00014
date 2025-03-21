@@ -13,7 +13,7 @@ interface ReviewListProps {
 }
 
 export function ReviewList({ reviews }: ReviewListProps) {
-  if (reviews.length === 0) {
+  if (!reviews || reviews.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">No reviews yet. Be the first to leave a review!</p>

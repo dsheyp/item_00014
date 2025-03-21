@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { Undo } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 // Define the enrolled course type
 export interface EnrolledCourse {
@@ -55,7 +57,12 @@ interface EnrollmentContextType {
   wishlist: WishlistCourse[]
   isInWishlist: (courseId: number) => boolean
   addToWishlist: (course: WishlistCourse) => void
-  removeFromWishlist: (courseId: number) => void
+  removeFromWishlist: (courseId: number, showToast: boolean) => void
+  // Pending actions
+  pendingUnenrollments: Record<number, NodeJS.Timeout>
+  pendingWishlistRemovals: Record<number, NodeJS.Timeout>
+  cancelUnenrollment: (courseId: number) => void
+  cancelWishlistRemoval: (courseId: number) => void
 }
 
 // Create the context with a default value
@@ -66,8 +73,11 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([])
   const [wishlist, setWishlist] = useState<WishlistCourse[]>([])
   const [showLessonCompleteToast, setShowLessonCompleteToast] = useState<boolean>(false)
+  const [pendingUnenrollments, setPendingUnenrollments] = useState<Record<number, NodeJS.Timeout>>({})
+  const [pendingWishlistRemovals, setPendingWishlistRemovals] = useState<Record<number, NodeJS.Timeout>>({})
   const { toast } = useToast()
   const ENROLLED_TOAST_DURATION = 2000
+  const UNDO_TIMEOUT_DURATION = 5000
 
   // Load enrolled courses and wishlist from localStorage on initial render
   useEffect(() => {
@@ -124,6 +134,62 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("wishlistCourses", JSON.stringify(wishlist))
   }, [wishlist])
 
+  // handle delayed unenrollments
+  useEffect(() => {
+
+    for (const key in pendingUnenrollments) {
+      const course = enrolledCourses.find((c) => c.id === parseInt(key))
+      if(course) {
+        // Show toast with undo option
+        toast({
+          title: "Unenrolling from course",
+          description: `You will be unenrolled from "${course.title}" in 5 seconds.`,
+          action: (
+            <Button variant="outline" size="sm" onClick={() => cancelUnenrollment(course.id)} className="gap-1">
+              Undo
+            </Button>
+          ),
+          duration: UNDO_TIMEOUT_DURATION,
+        })
+      }
+  }
+
+  /*
+    return () => {
+      // Clear all pending unenrollments
+      Object.values(pendingUnenrollments).forEach((timeoutId) => {
+        clearTimeout(timeoutId)
+      })
+      // Clear all pending wishlist removals
+      Object.values(pendingWishlistRemovals).forEach((timeoutId) => {
+        clearTimeout(timeoutId)
+      })
+    }
+  */
+
+  }, [pendingUnenrollments])
+
+  // handle delayed wishlist removal
+  useEffect(() => {
+
+    for (const key in pendingWishlistRemovals) {
+      const course = wishlist.find((c) => c.id === parseInt(key))
+      const enrolledCourse = enrolledCourses.find((c) => c.id === parseInt(key))
+      if(course && ! enrolledCourse) {
+        // Show toast with undo option
+        toast({
+          title: "Removing from wishlist",
+          description: `"${course.title}" will be removed from your wishlist in 5 seconds.`,
+          action: (
+            <Button variant="outline" size="sm" onClick={() => cancelWishlistRemoval(course.id)} className="gap-1">
+              Undo
+            </Button>
+          ),
+          duration: UNDO_TIMEOUT_DURATION,
+        })
+      }
+    }
+  }, [pendingWishlistRemovals])
 
   // Simulate lesson completion
   const simulateLessonCompletion = (courseId: number) => {
@@ -144,12 +210,14 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
     const lastLesson = lessonNames[randomLessonIndex]
     // Update course progress
     updateCourseProgress(courseId, newProgress, newCompletedLessons, lastLesson)
-    // Show toast notification
+    // Show toast notification - no, let's not. too many conflicts to solve here with other toasts/state related
+    /*
     toast({
       title: "Lessons Completed.",
       description: `Course instructor has confirmed your completion of ${lessonsToAdd} lesson${lessonsToAdd > 1 ? "s" : ""} in "${course.title}".`,
       duration: 6000,
     })
+    */
   }
 
   // Check if a user is enrolled in a specific course
@@ -159,6 +227,11 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
 
   // Enroll in a course
   const enrollInCourse = (course: { id: number; title: string; image: string; lessons: number }) => {
+    // Cancel any pending unenrollment for this course
+    if (pendingUnenrollments[course.id]) {
+      cancelUnenrollment(course.id)
+      return
+    }
     if (isEnrolled(course.id)) {
       toast({
         title: "Already Enrolled",
@@ -181,9 +254,10 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
     setShowLessonCompleteToast(true)
 
     setEnrolledCourses((prev) => [...prev, newEnrolledCourse])
+
     // If the course was in the wishlist, remove it
     if (isInWishlist(course.id)) {
-      removeFromWishlist(course.id)
+      removeFromWishlist(course.id, false)
     }
 
     toast({
@@ -193,21 +267,75 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  // Unenroll from a course
+  // Unenroll from a course with undo functionality
   const unenrollFromCourse = (courseId: number) => {
     const course = enrolledCourses.find((c) => c.id === courseId)
 
     if (!course) {
       return
     }
+    // If there's already a pending unenrollment, proceed with immediate unenrollment
+    if (pendingUnenrollments[courseId]) {
+      // Clear the existing timeout
+      clearTimeout(pendingUnenrollments[courseId])
+      // Remove the course immediately
 
     setEnrolledCourses((prev) => prev.filter((course) => course.id !== courseId))
+      // Remove from pending unenrollments
+      setPendingUnenrollments((prev) => {
+        const updated = { ...prev }
+        delete updated[courseId]
+        return updated
+      })
 
     toast({
       title: "Unenrolled",
       description: `You have unenrolled from "${course.title}"`,
       duration: ENROLLED_TOAST_DURATION,
     })
+      return
+    }
+
+    // Set a timeout to actually unenroll after 5 seconds
+    const timeoutId = setTimeout(() => {
+      setEnrolledCourses((prev) => prev.filter((course) => course.id !== courseId))
+      // Remove from pending unenrollments
+      setPendingUnenrollments((prev) => {
+        const updated = { ...prev }
+        delete updated[courseId]
+        return updated
+      })
+      toast({
+        title: "Unenrolled",
+        description: `You have been unenrolled from "${course.title}"`,
+        duration: ENROLLED_TOAST_DURATION,
+      })
+    }, UNDO_TIMEOUT_DURATION)
+    // Add to pending unenrollments
+    setPendingUnenrollments((prev) => ({
+      ...prev,
+      [courseId]: timeoutId,
+    }))
+  }
+  // Cancel a pending unenrollment
+  const cancelUnenrollment = (courseId: number) => {
+    if (pendingUnenrollments[courseId]) {
+      clearTimeout(pendingUnenrollments[courseId])
+      // Remove from pending unenrollments
+      setPendingUnenrollments((prev) => {
+        const updated = { ...prev }
+        delete updated[courseId]
+        return updated
+      })
+      const course = enrolledCourses.find((c) => c.id === courseId)
+      if (course) {
+        toast({
+          title: "Unenrollment cancelled",
+          description: `You're still enrolled in "${course.title}".`,
+          duration: ENROLLED_TOAST_DURATION,
+        })
+      }
+    }
   }
 
   // Update course progress
@@ -222,6 +350,11 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
   }
   // Add a course to the wishlist
   const addToWishlist = (course: WishlistCourse) => {
+    // Cancel any pending wishlist removal for this course
+    if (pendingWishlistRemovals[course.id]) {
+      cancelWishlistRemoval(course.id)
+      return
+    }
     if (isInWishlist(course.id)) {
       toast({
         title: "Already in Wishlist",
@@ -245,18 +378,80 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
       duration: ENROLLED_TOAST_DURATION,
     })
   }
-  // Remove a course from the wishlist
-  const removeFromWishlist = (courseId: number) => {
+  // Remove a course from the wishlist with undo functionality
+  const removeFromWishlist = (courseId: number, showToast: boolean) => {
     const course = wishlist.find((c) => c.id === courseId)
+    const courseEnrolled = enrolledCourses.find((c) => c.id === courseId)
     if (!course) {
       return
     }
-    setWishlist((prev) => prev.filter((course) => course.id !== courseId))
-    toast({
-      title: "Removed from Wishlist",
-      description: `"${course.title}" has been removed from your wishlist`,
-      duration: ENROLLED_TOAST_DURATION,
-    })
+
+    // If there's already a pending removal, proceed with immediate removal
+    if (!showToast || pendingWishlistRemovals[courseId]) {
+      // Clear the existing timeout
+      clearTimeout(pendingWishlistRemovals[courseId])
+      // Remove the course immediately
+      setWishlist((prev) => prev.filter((course) => course.id !== courseId))
+      // Remove from pending removals
+      setPendingWishlistRemovals((prev) => {
+        const updated = { ...prev }
+        delete updated[courseId]
+        return updated
+      })
+      if(showToast || !courseEnrolled) {
+        toast({
+          title: "Removed from Wishlist",
+          description: `"${course.title}" has been removed from your wishlist`,
+          duration: ENROLLED_TOAST_DURATION,
+        })
+      }
+      return
+    }
+
+    // Set a timeout to actually remove after 5 seconds
+    const timeoutId = setTimeout(() => {
+      const courseEnrolled = enrolledCourses.find((c) => c.id === courseId)
+
+      setWishlist((prev) => prev.filter((course) => course.id !== courseId))
+      // Remove from pending removals
+      setPendingWishlistRemovals((prev) => {
+        const updated = { ...prev }
+        delete updated[courseId]
+        return updated
+      })
+      if(!courseEnrolled) {
+        toast({
+          title: "Removed from wishlist",
+          description: `"${course.title}" has been removed from your wishlist`,
+          duration: ENROLLED_TOAST_DURATION,
+        })
+      }
+    }, UNDO_TIMEOUT_DURATION)
+    // Add to pending removals
+    setPendingWishlistRemovals((prev) => ({
+      ...prev,
+      [courseId]: timeoutId,
+    }))
+  }
+  // Cancel a pending wishlist removal
+  const cancelWishlistRemoval = (courseId: number) => {
+    if (pendingWishlistRemovals[courseId]) {
+      clearTimeout(pendingWishlistRemovals[courseId])
+      // Remove from pending removals
+      setPendingWishlistRemovals((prev) => {
+        const updated = { ...prev }
+        delete updated[courseId]
+        return updated
+      })
+      const course = wishlist.find((c) => c.id === courseId)
+      if (course) {
+        toast({
+          title: "Removal cancelled",
+          description: `"${course.title}" is still in your wishlist.`,
+          duration: ENROLLED_TOAST_DURATION,
+        })
+      }
+    }
   }
 
   // Context value
@@ -270,6 +465,10 @@ export function EnrollmentProvider({ children }: { children: ReactNode }) {
     isInWishlist,
     addToWishlist,
     removeFromWishlist,
+    pendingUnenrollments,
+    pendingWishlistRemovals,
+    cancelUnenrollment,
+    cancelWishlistRemoval,
   }
 
   return <EnrollmentContext.Provider value={value}>{children}</EnrollmentContext.Provider>

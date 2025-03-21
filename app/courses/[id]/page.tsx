@@ -13,8 +13,8 @@ import { ReviewForm } from "@/components/review-form"
 import { ReviewList } from "@/components/review-list"
 import { StarRating } from "@/components/star-rating"
 import { useEnrollment } from "@/contexts/enrollment-context"
-import { Providers } from "../../providers"
 import { allCourses, type Course } from "@/data/courses"
+import { useToast } from "@/hooks/use-toast"
 
 import {
   AlertDialog,
@@ -39,6 +39,7 @@ interface Review {
 
 export default function CoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { toast } = useToast()
 
   const courseId = Number.parseInt(id)
   // Find the course in allCourses
@@ -74,15 +75,31 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   }
 
   const [course, setCourse] = useState<Course>(initialCourse)
-  const { isEnrolled, enrollInCourse, unenrollFromCourse, isInWishlist, addToWishlist, removeFromWishlist } =
-    useEnrollment()
+  const {
+    isEnrolled,
+    enrollInCourse,
+    unenrollFromCourse,
+    isInWishlist,
+    addToWishlist,
+    removeFromWishlist,
+    pendingUnenrollments,
+    pendingWishlistRemovals,
+  } = useEnrollment()
   const [enrolled, setEnrolled] = useState(false)
   const [inWishlist, setInWishlist] = useState(false)
+  const [isAlertOpen, setIsAlertOpen] = useState(false)
+
+
   // Check enrollment and wishlist status when component mounts
   useEffect(() => {
     setEnrolled(isEnrolled(courseId))
     setInWishlist(isInWishlist(courseId))
   }, [courseId, isEnrolled, isInWishlist])
+
+
+
+
+
 
   const handleEnroll = () => {
     // In a real app, this would make an API call to enroll the user
@@ -94,14 +111,18 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
     })
     setEnrolled(true)
   }
+
+
   const handleUnenroll = () => {
-    unenrollFromCourse(course.id)
-    setEnrolled(false)
+
+    setIsAlertOpen(false)
+      unenrollFromCourse(course.id)
+
   }
+
   const handleWishlistToggle = () => {
     if (inWishlist) {
-      removeFromWishlist(course.id)
-      setInWishlist(false)
+        removeFromWishlist(course.id, true)
     } else {
       addToWishlist({
         id: course.id,
@@ -161,6 +182,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
       }
     })
   }
+
   // If course not found, show a message
   if (course.id === 0) {
     return (
@@ -388,11 +410,11 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                     <Button asChild className="w-full">
                       <Link href={`/dashboard?tab=my-courses`}>Go to My Courses</Link>
                     </Button>
-                      <AlertDialog>
+                  <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="w-full">
+                      <Button variant="outline" className="w-full" disabled={!!pendingUnenrollments[course.id]}>
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Unenroll
+                        {pendingUnenrollments[course.id] ? "Unenrolling..." : "Unenroll"}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -404,9 +426,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleUnenroll}>
-                              Unenroll
-                            </AlertDialogAction>
+                        <AlertDialogAction onClick={handleUnenroll}>Unenroll</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -416,9 +436,18 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                     <Button className="w-full" onClick={handleEnroll}>
                       Enroll Now
                     </Button>
-                    <Button variant="outline" className="w-full flex items-center gap-2" onClick={handleWishlistToggle}>
+                  <Button
+                    variant="outline"
+                    className="w-full flex items-center gap-2"
+                    onClick={handleWishlistToggle}
+                    disabled={!!pendingWishlistRemovals[course.id]}
+                  >
                       <Heart className={inWishlist ? "fill-primary text-primary" : ""} size={16} />
-                      {inWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+                    {pendingWishlistRemovals[course.id]
+                      ? "Removing..."
+                      : inWishlist
+                        ? "Remove from Wishlist"
+                        : "Add to Wishlist"}
                 </Button>
                   </>
                 )}

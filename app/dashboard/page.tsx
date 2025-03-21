@@ -30,7 +30,15 @@ export default function DashboardPage() {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
   const [activeTab, setActiveTab] = useState(tabParam || "overview")
-  const { enrolledCourses, unenrollFromCourse, wishlist, removeFromWishlist, enrollInCourse } = useEnrollment()
+  const {
+    enrolledCourses,
+    unenrollFromCourse,
+    wishlist,
+    removeFromWishlist,
+    enrollInCourse,
+    pendingUnenrollments,
+    pendingWishlistRemovals,
+  } = useEnrollment()
 
 
 
@@ -222,9 +230,9 @@ export default function DashboardPage() {
                     <CardFooter className="flex justify-between">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline">
+                          <Button variant="outline" disabled={!!pendingUnenrollments[course.id]}>
                             <Trash2 className="h-10 w-4 mr-2" />
-                            Unenroll
+                            {pendingUnenrollments[course.id] ? "Unenrolling..." : "Unenroll"}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -299,9 +307,14 @@ export default function DashboardPage() {
                       </div>
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                      <Button variant="outline" size="sm" onClick={() => removeFromWishlist(course.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeFromWishlist(course.id)}
+                        disabled={!!pendingWishlistRemovals[course.id]}
+                      >
                         <Heart className="h-4 w-4 mr-2 fill-primary text-primary" />
-                        Remove
+                        {pendingWishlistRemovals[course.id] ? "Removing..." : "Remove"}
                       </Button>
                       <Button
                         onClick={() => {
